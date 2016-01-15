@@ -1,0 +1,5 @@
+beautifulsoup4
+docopt
+lxml
+pafy
+requests
