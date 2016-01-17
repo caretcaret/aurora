@@ -98,12 +98,18 @@ class HooktheoryScraper:
     os.makedirs(os.path.dirname(cache_path), exist_ok=True)
     try:
       audio_stream = pafy.new(request['id']).getbestaudio()
+      if audio_stream is None:
+        self.logger.info("%s has no audio", request['key'])
+        return processor(request, None)
       cache_full_path = '{}.{}'.format(cache_path, audio_stream.extension)
       audio_stream.download(filepath=cache_full_path)
       self.logger.info("Got %s", request['key'])
       return processor(request, cache_full_path)
     except OSError as e:
       self.logger.error("Couldn't get %s", request['key'])
+      return processor(request, None)
+    except ValueError as e:
+      self.logger.error("%s invalid", request['key'])
       return processor(request, None)
 
   def make_artist_list_request(self, character, page):
@@ -213,7 +219,7 @@ class HooktheoryScraper:
       return None
     
     youtube_id = youtube_element.string
-    if youtube_id == 'null':
+    if youtube_id is None or youtube_id == 'null':
       return None
 
     self.fetch_youtube(self.process_youtube, self.make_youtube_request(youtube_id))
