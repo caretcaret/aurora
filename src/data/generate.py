@@ -32,6 +32,7 @@ Usage:
 
 from __future__ import print_function
 
+import collections
 import glob
 import json
 import os
@@ -39,6 +40,8 @@ import subprocess
 import sys
 
 import docopt
+import tensorflow.python.platform
+import tensorflow as tf
 
 import theorytab
 
@@ -124,7 +127,63 @@ def clip_audio(specs, raw_audio, output):
 
 
 def generate_dataset(specs, clipped_audio, output):
-  pass
+  spec_filenames = next(os.walk(specs))[2]
+  audio_filenames = next(os.walk(clipped_audio))[2]
+  clips = collections.defaultdict(dict)
+  for spec_filename in spec_filenames:
+    spec_root, spec_ext = os.path.splitext(spec_filename)
+    clips[spec_root]['spec'] = spec_filename
+
+  for audio_filename in audio_filenames:
+    audio_root, audio_ext = os.path.splitext(audio_filename)
+    clips[audio_root]['audio'] = audio_filename
+
+  writer = tf.python_io.TFRecordWriter(output)
+  for clip_name in clips:
+    clip = clips[clip_name]
+    if 'audio' in clip and 'spec' in clip:
+      example = generate_example(os.path.join(specs, clip['spec']),
+                                 os.path.join(clipped_audio, clip['audio']))
+      writer.write(example.SerializeToString())
+    print(clip_name)
+  writer.close()
+
+
+def generate_example(spec_filename, audio_filename):
+  with open(spec_filename) as f:
+    spec = json.load(f)
+  return tf.train.SequenceExample(
+      context=tf.train.Features(feature={
+          'data_source': tf.train.Feature(
+              bytes_list=tf.train.BytesList(
+                  value=[bytes(spec['data_source'], 'utf-8')])),
+          'tonic': tf.train.Feature(
+              int64_list=tf.train.Int64List(
+                  value=[spec['key']['tonic']])),
+          'mode': tf.train.Feature(
+              int64_list=tf.train.Int64List(
+                  value=[spec['key']['mode']])),
+          'beats': tf.train.Feature(
+              int64_list=tf.train.Int64List(
+                  value=[spec['meter']['beats']])),
+          'beats_per_measure': tf.train.Feature(
+              int64_list=tf.train.Int64List(
+                  value=[spec['meter']['beats_per_measure']])),
+      }),
+      feature_lists=tf.train.FeatureLists(feature_list={
+          'melody_audio': tf.train.FeatureList(
+              feature=[tf.train.Feature(
+                  int64_list=tf.train.Int64List(value=[]))]),
+          'harmony_audio': tf.train.FeatureList(
+              feature=[tf.train.Feature(
+                  int64_list=tf.train.Int64List(value=[]))]),
+          'melody': tf.train.FeatureList(
+              feature=[tf.train.Feature(
+                  int64_list=tf.train.Int64List(value=[]))]),
+          'harmony': tf.train.FeatureList(
+              feature=[tf.train.Feature(
+                  int64_list=tf.train.Int64List(value=[]))]),
+  }))
 
 
 if __name__ == '__main__':
@@ -134,3 +193,6 @@ if __name__ == '__main__':
       generate_specs(args['<theorytabs>'], args['<audio>'], args['<output>'])
     elif args['clip_audio']:
       clip_audio(args['<specs>'], args['<raw_audio>'], args['<output>'])
+    elif args['generate_dataset']:
+      generate_dataset(args['<specs>'], args['<clipped_audio>'],
+                       args['<output>'])
