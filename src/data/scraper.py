@@ -32,7 +32,7 @@ class HooktheoryScraper:
   SONGS_URL_REGEX = re.compile(r'/theorytab/view/[a-z0-9\-]+/(.+)')
   SECTIONS_URL_TEMPLATE = "http://www.hooktheory.com/theorytab/view/{}/{}"
   SECTIONS_KEY_TEMPLATE = "song/{}-{}.html"
-  SECTIONS_URL_REGEX = re.compile(r'/theorytab/fork/id/([0-9]+)')
+  SECTIONS_URL_REGEX = re.compile(r'/hookpad/fork/id/([0-9]+)')
   SECTION_URL_TEMPLATE = "http://www.hooktheory.com/songs/getXmlByPk?pk={}"
   SECTION_KEY_TEMPLATE = "section/{}.xml"
   YOUTUBE_KEY_TEMPLATE = "youtube/{}"
@@ -180,7 +180,7 @@ class HooktheoryScraper:
 
   def process_song_list(self, request, response):
     """Scrape song ids from song lists. Fetch song page listing sections.
-    Estimated number of requests: ~7000
+    Estimated number of requests: ~8000
     """
     soup = bs4.BeautifulSoup(response, 'lxml')
     links = soup.find_all(href=lambda href: href and self.SONGS_URL_REGEX.match(href))
@@ -198,7 +198,7 @@ class HooktheoryScraper:
 
   def process_section_list(self, request, response):
     """Scrape section ids from song pages. Fetch theory data.
-    Estimated number of requests: ~11000
+    Estimated number of requests: ~13000
     """
     soup = bs4.BeautifulSoup(response, 'lxml')
     links = soup.find_all(href=lambda href: href and self.SECTIONS_URL_REGEX.match(href))
@@ -211,7 +211,7 @@ class HooktheoryScraper:
 
   def process_section(self, request, response):
     """Scrape YouTube ids from theory data.
-    Estimated number of requests: ~11000
+    Estimated number of requests: ~13000
     """
     soup = bs4.BeautifulSoup(response, 'xml')
     youtube_element = soup.find("YouTubeID")
@@ -231,7 +231,7 @@ class HooktheoryScraper:
 
 
 def main(args):
-  """User-Agent will be set to 'github.com/jczhang/aurora' for transparency.
+  """User-Agent will indicate the source of the requests for transparency.
   Responses are cached to disk before parsing for troubleshooting and to prevent repeated requests.
   """
   cache = args['--cache']
@@ -241,7 +241,7 @@ def main(args):
 
   if youtube_api_key is not None:
     pafy.set_api_key(youtube_api_key)
-  scraper = HooktheoryScraper(cache=cache, fresh=fresh, user_agent='github.com/jczhang/aurora', loglevel=loglevel)
+  scraper = HooktheoryScraper(cache=cache, fresh=fresh, user_agent='github.com/caretcaret/aurora', loglevel=loglevel)
   result = scraper.run(string.ascii_lowercase + string.digits)
   print(result)
 

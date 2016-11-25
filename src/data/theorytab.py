@@ -30,6 +30,7 @@ class Theorytab:
     # example versions:
     # version 1.1: section >= 173661
     # version 1.2: section >= 191620
+    # version 1.3: section >= 280191
 
   def clips(self):
     """Separates the theorytab file into sections with backing YouTube video.

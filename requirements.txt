@@ -3,3 +3,4 @@ docopt
 lxml
 pafy
 requests
+youtube-dl
