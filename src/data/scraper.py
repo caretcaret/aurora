@@ -24,10 +24,10 @@ import pafy
 import requests
 
 class HooktheoryScraper:
-  ARTISTS_URL_TEMPLATE = "http://www.hooktheory.com/theorytab/artists/{}?page={}"
-  ARTISTS_KEY_TEMPLATE = "character/{}-{}.html"
+  ARTISTS_URL_TEMPLATE = "http://www.hooktheory.com/theorytab/artists/_?page={}"
+  ARTISTS_KEY_TEMPLATE = "artist_list/{}.html"
   ARTISTS_URL_REGEX = re.compile(r'/theorytab/artists/[a-z0-9\-]/(.+)')
-  SONGS_URL_TEMPLATE = "http://www.hooktheory.com/theorytab/artists/a/{}?page={}"
+  SONGS_URL_TEMPLATE = "http://www.hooktheory.com/theorytab/artists/_/{}?page={}"
   SONGS_KEY_TEMPLATE = "artist/{}-{}.html"
   SONGS_URL_REGEX = re.compile(r'/theorytab/view/[a-z0-9\-]+/(.+)')
   SECTIONS_URL_TEMPLATE = "http://www.hooktheory.com/theorytab/view/{}/{}"
@@ -49,9 +49,6 @@ class HooktheoryScraper:
     ch.setLevel(loglevel)
 
     self.options = options
-
-  def fetch_many(self, fetcher, processor, requests):
-    return [fetcher(processor, request) for request in requests]
 
   def fetch_html(self, processor, request):
     """Fetches an html page.
@@ -111,12 +108,14 @@ class HooktheoryScraper:
     except ValueError as e:
       self.logger.error("%s invalid", request['key'])
       return processor(request, None)
+    except TypeError as e:
+      self.logger.error("%s invalid", request['key'])
+      return processor(request, None)
 
-  def make_artist_list_request(self, character, page):
+  def make_artist_list_request(self, page):
     return {
-      'key': self.ARTISTS_KEY_TEMPLATE.format(character, page),
-      'url': self.ARTISTS_URL_TEMPLATE.format(character, page),
-      'character': character,
+      'key': self.ARTISTS_KEY_TEMPLATE.format(page),
+      'url': self.ARTISTS_URL_TEMPLATE.format(page),
       'page': page,
     }
 
@@ -149,21 +148,17 @@ class HooktheoryScraper:
       'id': youtube_id,
     }
 
-  def run(self, characters):
-    """Start by exploring artists by first letter/number. This should cover most if not all songs.
-    Estimated number of requests: ~100
+  def run(self):
+    """Start by exploring artists. This should cover most if not all songs.
+    Estimated number of requests: ~40
     """
-    requests = (self.make_artist_list_request(character, 1) for character in list(characters))
-    artistss = self.fetch_many(self.fetch_html, self.process_artist_list, requests)
-    result = {}
-    for artists in artistss:
-      result.update(artists)
-    return result
+    self.make_artist_list_request(1)
+    return self.fetch_html(self.process_artist_list, self.make_artist_list_request(1))
 
   def process_artist_list(self, request, response):
     """Scrape artist ids from artist lists. Fetch artist pages listing songs.
     If the list of artists is more than 100 long, increment the page number and fetch more artists.
-    Estimated number of requests: ~5000
+    Estimated number of requests: ~4000
     """
     soup = bs4.BeautifulSoup(response, 'lxml')
     links = soup.find_all(href=lambda href: href and self.ARTISTS_URL_REGEX.match(href))
@@ -173,14 +168,14 @@ class HooktheoryScraper:
       result[artist_id] = self.fetch_html(self.process_song_list, self.make_song_list_request(artist_id, 1))
 
     if len(links) >= 100:
-      request_ = self.make_artist_list_request(request['character'], request['page'] + 1)
+      request_ = self.make_artist_list_request(request['page'] + 1)
       result.update(self.fetch_html(self.process_artist_list, request_))
 
     return result
 
   def process_song_list(self, request, response):
     """Scrape song ids from song lists. Fetch song page listing sections.
-    Estimated number of requests: ~8000
+    Estimated number of requests: ~8500
     """
     soup = bs4.BeautifulSoup(response, 'lxml')
     links = soup.find_all(href=lambda href: href and self.SONGS_URL_REGEX.match(href))
@@ -198,7 +193,7 @@ class HooktheoryScraper:
 
   def process_section_list(self, request, response):
     """Scrape section ids from song pages. Fetch theory data.
-    Estimated number of requests: ~13000
+    Estimated number of requests: ~14000
     """
     soup = bs4.BeautifulSoup(response, 'lxml')
     links = soup.find_all(href=lambda href: href and self.SECTIONS_URL_REGEX.match(href))
@@ -211,7 +206,7 @@ class HooktheoryScraper:
 
   def process_section(self, request, response):
     """Scrape YouTube ids from theory data.
-    Estimated number of requests: ~13000
+    Estimated number of requests: ~14000
     """
     soup = bs4.BeautifulSoup(response, 'xml')
     youtube_element = soup.find("YouTubeID")
@@ -242,8 +237,7 @@ def main(args):
   if youtube_api_key is not None:
     pafy.set_api_key(youtube_api_key)
   scraper = HooktheoryScraper(cache=cache, fresh=fresh, user_agent='github.com/caretcaret/aurora', loglevel=loglevel)
-  result = scraper.run(string.ascii_lowercase + string.digits)
-  print(result)
+  result = scraper.run()
 
 if __name__ == '__main__':
   args = docopt.docopt(__doc__, sys.argv[1:])
