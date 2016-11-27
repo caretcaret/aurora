@@ -59,14 +59,14 @@ class HooktheoryScraper:
       string containing html.
     """
     cache_path = os.path.join(self.cache, request['key']) if self.cache is not None else None
-    if not self.fresh and cache_path is not None and os.path.exists(cache_path):
+    if not self.fresh and cache_path and os.path.exists(cache_path):
       with open(cache_path) as f:
         response = f.read()
       self.logger.info("Got %s from cache", request['key'])
     else:
       headers = {'user-agent': self.user_agent}
       response = requests.get(request['url'], headers=headers).text
-      if self.cache is not None:
+      if self.cache:
         os.makedirs(os.path.dirname(cache_path), exist_ok=True)
         with open(cache_path, 'w') as f:
           f.write(response)
@@ -82,7 +82,7 @@ class HooktheoryScraper:
     Response:
       string path of the downloaded file.
     """
-    if self.cache is None:
+    if not self.cache:
       return processor(request, None)
 
     cache_path = os.path.join(self.cache, request['key'])
@@ -95,7 +95,7 @@ class HooktheoryScraper:
     os.makedirs(os.path.dirname(cache_path), exist_ok=True)
     try:
       audio_stream = pafy.new(request['id']).getbestaudio()
-      if audio_stream is None:
+      if not audio_stream:
         self.logger.info("%s has no audio", request['key'])
         return processor(request, None)
       cache_full_path = '{}.{}'.format(cache_path, audio_stream.extension)
@@ -210,13 +210,10 @@ class HooktheoryScraper:
     """
     soup = bs4.BeautifulSoup(response, 'xml')
     youtube_element = soup.find("YouTubeID")
-    if youtube_element is None:
+    if not youtube_element or not youtube_element.string or youtube_element.string == 'null':
       return None
     
-    youtube_id = youtube_element.string
-    if youtube_id is None or youtube_id == 'null':
-      return None
-
+    youtube_id = str(youtube_element.string)
     self.fetch_youtube(self.process_youtube, self.make_youtube_request(youtube_id))
     return youtube_id
 
