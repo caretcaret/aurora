@@ -1,6 +1,10 @@
-"""Downloads community-generated music analysis data from hooktheory theorytab and YouTube audio.
+"""Downloads community-generated music analysis data from hooktheory
+theorytab and YouTube audio.
 
-Usage: scraper.py [--cache=<path>] [--fresh] [--loglevel=<level>] [--youtube_api_key=<key>]
+Usage: scraper.py [--cache=<path>]
+                  [--fresh]
+                  [--loglevel=<level>]
+                  [--youtube_api_key=<key>]
 
 Options:
   --cache=<path>           Set cache directory to <path>.
@@ -23,11 +27,14 @@ import docopt
 import pafy
 import requests
 
+
 class HooktheoryScraper:
-  ARTISTS_URL_TEMPLATE = "http://www.hooktheory.com/theorytab/artists/_?page={}"
+  ARTISTS_URL_TEMPLATE = \
+      "http://www.hooktheory.com/theorytab/artists/_?page={}"
   ARTISTS_KEY_TEMPLATE = "artist_list/{}.html"
   ARTISTS_URL_REGEX = re.compile(r'/theorytab/artists/[a-z0-9\-]/(.+)')
-  SONGS_URL_TEMPLATE = "http://www.hooktheory.com/theorytab/artists/_/{}?page={}"
+  SONGS_URL_TEMPLATE = \
+      "http://www.hooktheory.com/theorytab/artists/_/{}?page={}"
   SONGS_KEY_TEMPLATE = "artist/{}-{}.html"
   SONGS_URL_REGEX = re.compile(r'/theorytab/view/[a-z0-9\-]+/(.+)')
   SECTIONS_URL_TEMPLATE = "http://www.hooktheory.com/theorytab/view/{}/{}"
@@ -37,7 +44,8 @@ class HooktheoryScraper:
   SECTION_KEY_TEMPLATE = "section/{}.xml"
   YOUTUBE_KEY_TEMPLATE = "youtube/{}"
 
-  def __init__(self, *, cache=None, fresh=False, user_agent=None, loglevel='WARNING', **options):
+  def __init__(self, *, cache=None, fresh=False, user_agent=None,
+               loglevel='WARNING', **options):
     self.cache = cache
     self.fresh = fresh
     self.user_agent = user_agent
@@ -58,7 +66,11 @@ class HooktheoryScraper:
     Response:
       string containing html.
     """
-    cache_path = os.path.join(self.cache, request['key']) if self.cache is not None else None
+    if self.cache:
+      cache_path = os.path.join(self.cache, request['key'])
+    else:
+      cache_path = None
+
     if not self.fresh and cache_path and os.path.exists(cache_path):
       with open(cache_path) as f:
         response = f.read()
@@ -114,38 +126,38 @@ class HooktheoryScraper:
 
   def make_artist_list_request(self, page):
     return {
-      'key': self.ARTISTS_KEY_TEMPLATE.format(page),
-      'url': self.ARTISTS_URL_TEMPLATE.format(page),
-      'page': page,
+        'key': self.ARTISTS_KEY_TEMPLATE.format(page),
+        'url': self.ARTISTS_URL_TEMPLATE.format(page),
+        'page': page,
     }
 
   def make_song_list_request(self, artist_id, page):
     return {
-      'key': self.SONGS_KEY_TEMPLATE.format(artist_id, page),
-      'url': self.SONGS_URL_TEMPLATE.format(artist_id, page),
-      'artist_id': artist_id,
-      'page': page,
+        'key': self.SONGS_KEY_TEMPLATE.format(artist_id, page),
+        'url': self.SONGS_URL_TEMPLATE.format(artist_id, page),
+        'artist_id': artist_id,
+        'page': page,
     }
 
   def make_section_list_request(self, artist_id, song_id):
     return {
-      'key': self.SECTIONS_KEY_TEMPLATE.format(artist_id, song_id),
-      'url': self.SECTIONS_URL_TEMPLATE.format(artist_id, song_id),
-      'artist_id': artist_id,
-      'song_id': song_id,
+        'key': self.SECTIONS_KEY_TEMPLATE.format(artist_id, song_id),
+        'url': self.SECTIONS_URL_TEMPLATE.format(artist_id, song_id),
+        'artist_id': artist_id,
+        'song_id': song_id,
     }
 
   def make_section_request(self, section_id):
     return {
-      'key': self.SECTION_KEY_TEMPLATE.format(section_id),
-      'url': self.SECTION_URL_TEMPLATE.format(section_id),
-      'section_id': section_id,
+        'key': self.SECTION_KEY_TEMPLATE.format(section_id),
+        'url': self.SECTION_URL_TEMPLATE.format(section_id),
+        'section_id': section_id,
     }
 
   def make_youtube_request(self, youtube_id):
     return {
-      'key': self.YOUTUBE_KEY_TEMPLATE.format(youtube_id),
-      'id': youtube_id,
+        'key': self.YOUTUBE_KEY_TEMPLATE.format(youtube_id),
+        'id': youtube_id,
     }
 
   def run(self):
@@ -153,19 +165,23 @@ class HooktheoryScraper:
     Estimated number of requests: ~40
     """
     self.make_artist_list_request(1)
-    return self.fetch_html(self.process_artist_list, self.make_artist_list_request(1))
+    return self.fetch_html(self.process_artist_list,
+                           self.make_artist_list_request(1))
 
   def process_artist_list(self, request, response):
     """Scrape artist ids from artist lists. Fetch artist pages listing songs.
-    If the list of artists is more than 100 long, increment the page number and fetch more artists.
+    If the list of artists is more than 100 long, increment the page number
+    and fetch more artists.
     Estimated number of requests: ~4000
     """
     soup = bs4.BeautifulSoup(response, 'lxml')
-    links = soup.find_all(href=lambda href: href and self.ARTISTS_URL_REGEX.match(href))
+    links = soup.find_all(href=lambda href: href and
+                          self.ARTISTS_URL_REGEX.match(href))
     result = {}
     for link in links:
       artist_id = self.ARTISTS_URL_REGEX.match(link.get('href')).group(1)
-      result[artist_id] = self.fetch_html(self.process_song_list, self.make_song_list_request(artist_id, 1))
+      result[artist_id] = self.fetch_html(
+          self.process_song_list, self.make_song_list_request(artist_id, 1))
 
     if len(links) >= 100:
       request_ = self.make_artist_list_request(request['page'] + 1)
@@ -178,15 +194,19 @@ class HooktheoryScraper:
     Estimated number of requests: ~8500
     """
     soup = bs4.BeautifulSoup(response, 'lxml')
-    links = soup.find_all(href=lambda href: href and self.SONGS_URL_REGEX.match(href))
+    links = soup.find_all(href=lambda href: href and
+                          self.SONGS_URL_REGEX.match(href))
     artist_id = request['artist_id']
     result = {}
     for link in links:
       song_id = self.SONGS_URL_REGEX.match(link.get('href')).group(1)
-      result[song_id] = self.fetch_html(self.process_section_list, self.make_section_list_request(artist_id, song_id))
+      result[song_id] = self.fetch_html(
+          self.process_section_list,
+          self.make_section_list_request(artist_id, song_id))
 
     if len(links) >= 100:
-      request_ = self.make_song_list_request(request['artist_id'], request['page'] + 1)
+      request_ = self.make_song_list_request(
+          request['artist_id'], request['page'] + 1)
       result.update(self.fetch_html(self.process_song_list, request_))
 
     return result
@@ -196,11 +216,13 @@ class HooktheoryScraper:
     Estimated number of requests: ~14000
     """
     soup = bs4.BeautifulSoup(response, 'lxml')
-    links = soup.find_all(href=lambda href: href and self.SECTIONS_URL_REGEX.match(href))
+    links = soup.find_all(href=lambda href: href and
+                          self.SECTIONS_URL_REGEX.match(href))
     result = {}
     for link in links:
       section_id = self.SECTIONS_URL_REGEX.match(link.get('href')).group(1)
-      result[section_id] = self.fetch_html(self.process_section, self.make_section_request(section_id))
+      result[section_id] = self.fetch_html(
+          self.process_section, self.make_section_request(section_id))
 
     return result
 
@@ -210,11 +232,14 @@ class HooktheoryScraper:
     """
     soup = bs4.BeautifulSoup(response, 'xml')
     youtube_element = soup.find("YouTubeID")
-    if not youtube_element or not youtube_element.string or youtube_element.string == 'null':
+    if (not youtube_element or
+            not youtube_element.string or
+            youtube_element.string == 'null'):
       return None
-    
+
     youtube_id = str(youtube_element.string)
-    self.fetch_youtube(self.process_youtube, self.make_youtube_request(youtube_id))
+    self.fetch_youtube(self.process_youtube,
+                       self.make_youtube_request(youtube_id))
     return youtube_id
 
   def process_youtube(self, request, response):
@@ -224,7 +249,8 @@ class HooktheoryScraper:
 
 def main(args):
   """User-Agent will indicate the source of the requests for transparency.
-  Responses are cached to disk before parsing for troubleshooting and to prevent repeated requests.
+  Responses are cached to disk before parsing for troubleshooting and to
+  prevent repeated requests.
   """
   cache = args['--cache']
   fresh = args['--fresh']
@@ -233,7 +259,9 @@ def main(args):
 
   if youtube_api_key is not None:
     pafy.set_api_key(youtube_api_key)
-  scraper = HooktheoryScraper(cache=cache, fresh=fresh, user_agent='github.com/caretcaret/aurora', loglevel=loglevel)
+  scraper = HooktheoryScraper(cache=cache, fresh=fresh,
+                              user_agent='github.com/caretcaret/aurora',
+                              loglevel=loglevel)
   result = scraper.run()
 
 if __name__ == '__main__':
