@@ -1,5 +1,6 @@
 beautifulsoup4
 docopt
+librosa
 lxml
 pafy
 requests

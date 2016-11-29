@@ -35,12 +35,13 @@ from __future__ import print_function
 import collections
 import glob
 import json
+import math
 import os
 import subprocess
 import sys
 
 import docopt
-import tensorflow.python.platform
+import librosa
 import tensorflow as tf
 
 import theorytab
@@ -152,6 +153,18 @@ def generate_dataset(specs, clipped_audio, output):
 def generate_example(spec_filename, audio_filename):
   with open(spec_filename) as f:
     spec = json.load(f)
+
+  spec_duration = (spec['audio_source']['end_time'] -
+                   spec['audio_source']['start_time'])
+  sample_duration = librosa.get_duration(filename=audio_filename)
+  if not math.isclose(spec_duration, sample_duration):
+    print("Warning: sample duration is {} but spec says {}".format(
+        sample_duration, spec_duration))
+
+  sample, sampling_rate = librosa.load(audio_filename, sr=44100)
+  if sampling_rate != 44100:
+    print("Warning: sampling rate is {}".format(sampling_rate))
+  
   return tf.train.SequenceExample(
       context=tf.train.Features(feature={
           'data_source': tf.train.Feature(
@@ -171,12 +184,9 @@ def generate_example(spec_filename, audio_filename):
                   value=[spec['meter']['beats_per_measure']])),
       }),
       feature_lists=tf.train.FeatureLists(feature_list={
-          'melody_audio': tf.train.FeatureList(
+          'audio': tf.train.FeatureList(
               feature=[tf.train.Feature(
-                  int64_list=tf.train.Int64List(value=[]))]),
-          'harmony_audio': tf.train.FeatureList(
-              feature=[tf.train.Feature(
-                  int64_list=tf.train.Int64List(value=[]))]),
+                  float_list=tf.train.FloatList(value=sample.tolist()))]),
           'melody': tf.train.FeatureList(
               feature=[tf.train.Feature(
                   int64_list=tf.train.Int64List(value=[]))]),
